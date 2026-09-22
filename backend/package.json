@@ -1,0 +1,28 @@
+{
+  "name": "salasar-welfare-backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "HR Welfare API — syncs the Welfare Officer Return workbook from Google Drive into MongoDB and streams updates.",
+  "type": "module",
+  "main": "src/server.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "node --watch --env-file-if-exists=.env src/server.js",
+    "start": "node --env-file-if-exists=.env src/server.js",
+    "sync:once": "node --env-file-if-exists=.env scripts/sync-once.js",
+    "parse:file": "node scripts/parse-file.js",
+    "test": "node --test \"test/**/*.test.js\""
+  },
+  "dependencies": {
+    "@googleapis/drive": "^26.0.0",
+    "cors": "^2.8.5",
+    "exceljs": "^4.4.0",
+    "express": "^5.2.1",
+    "helmet": "^8.1.0",
+    "jszip": "^3.10.2",
+    "mongoose": "^9.10.1",
+    "zod": "^4.1.0"
+  }
+}
