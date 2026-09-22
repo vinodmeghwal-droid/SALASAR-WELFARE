@@ -4,8 +4,8 @@ An analytics dashboard for Salasar Techno Engineering's monthly **Welfare Office
 
 - **Module:** HR Welfare → **Sub-topic:** Officer Return
 - **Views:** Annual Summary (year to date) plus one tab per month, April to March (matching the workbook tabs)
-- **Sign-in:** Google OAuth, limited to company accounts
-- **Stack:** Next.js 16 · Tailwind CSS 4 · Recharts · Motion | Node.js · Express 5 · MongoDB (Mongoose) · Google Drive API | Python (workbook inspection tool)
+- **Sign-in:** Google OAuth, limited to an email allowlist (`ALLOWED_EMAILS`)
+- **Stack:** Next.js 16 · Tailwind CSS 4 · Recharts · Motion | Node.js · Express 5 · MongoDB Atlas (Mongoose) · Google Drive API · Gemini API | Python (workbook inspection tool)
 
 ---
 
@@ -16,6 +16,7 @@ An analytics dashboard for Salasar Techno Engineering's monthly **Welfare Office
 | **Annual Summary** | 8 KPI tiles, a 12-month submission tracker, monthly trend charts (workload, headcount by gender, joinings vs separations), year-to-date breakdowns (grievances, accidents, health, training, activities), compliance meters, a KPI-by-month table, and a data-checks panel |
 | **Monthly return** | Every section of the sheet (A–J) visualised: manpower movement and gender split, facility cards, health and accident charts, grievance resolution, activities, contractor compliance matrix, statutory checklist, and a training calendar |
 | **Live sync** | The backend polls Drive metadata every 30 s. When the file changes it downloads, re-parses and stores the data, then pushes a Server-Sent Event, and open dashboards refresh themselves with a toast naming the changed months. A **Sync now** button forces a sync immediately. |
+| **AI analysis (Gemini)** | Each view (annual and each submitted month) gets an AI card: a 0–100 health score, headline and summary, key figures, what's going well, risks and data issues ranked by severity, and prioritised actions. It uses only the numbers on the page (no names or addresses are sent), is cached per data version, and regenerates automatically when the workbook changes. It falls back across models when Gemini is overloaded. |
 | **Empty months** | Months that are still blank templates show an "awaiting data" state. They fill in automatically once the officer enters data. |
 | **Data checks** | Flags inconsistencies in the workbook, e.g. the manpower TOTAL row counting workers twice, the Annual Summary tab reading the wrong rows, and ambiguous dates |
 | **UX** | Responsive (phone → wide desktop), light/dark/system theme, animated transitions, count-up KPIs, chart ⇄ table toggle on every chart, keyboard-navigable tabs, and a colour-blind-safe validated palette |
@@ -85,16 +86,18 @@ SALASAR-Welfare/
 
 ### 1. Google Cloud
 1. **Enable** the *Google Drive API*.
-2. **OAuth client** (for sign-in): APIs & Services → Credentials → *Create OAuth client ID* → Web application.
+2. **OAuth client** (used for both sign-in and Drive sync): APIs & Services → Credentials → *Create OAuth client ID* → Web application.
    - Authorised JavaScript origin: `http://localhost:3000` (plus your production URL)
-   - Authorised redirect URI: `http://localhost:3000/api/auth/callback/google`
-3. **Service account** (for Drive sync): create one, then create a JSON key.
-   **Share the workbook with the service account's email as Viewer.** Without this the sync returns 404.
+   - Authorised redirect URIs: `http://localhost:3000/api/auth/callback/google` **and** `http://localhost:5555/oauth2callback`
+   - OAuth consent screen: add `vinod.meghwal@salasartechno.com` and `ambeydeep8052@gmail.com` as test users while the app is in *Testing*.
+3. **Drive access as the workbook owner.** Put the client id/secret in `backend/.env` (`GOOGLE_OAUTH_CLIENT_ID/SECRET`), then run `npm run drive:authorize` in `backend/`, open the printed URL, sign in as **vinod.meghwal@salasartechno.com**, and approve read-only Drive access. Paste the printed `GOOGLE_OAUTH_REFRESH_TOKEN` into `backend/.env` and set `DATA_SOURCE=drive`.
+   *Alternative:* a service account (`…@….iam.gserviceaccount.com` + JSON key) that the workbook is shared with as Viewer.
+4. **Gemini** (optional): an API key from AI Studio in `GEMINI_API_KEY`.
 
 ### 2. Backend
 ```bash
 cd backend
-cp .env.example .env        # fill in MONGODB_URI, INTERNAL_API_KEY, service-account credentials
+cp .env.example .env        # fill in MONGODB_URI, INTERNAL_API_KEY, Drive OAuth values, GEMINI_API_KEY
 npm install
 npm test                    # parser/KPI tests against the real workbook
 npm run dev                 # http://localhost:4000  (GET /health)
@@ -117,15 +120,18 @@ npm run dev                 # http://localhost:3000
 | `INTERNAL_API_KEY` | Shared secret with the frontend (≥ 16 chars) |
 | `DATA_SOURCE` | `drive` (default) or `local` |
 | `DRIVE_FILE_ID` | Workbook file id (defaults to the 2026-27 workbook) |
-| `GOOGLE_SERVICE_ACCOUNT_EMAIL` / `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` | Service-account credentials, **or** `GOOGLE_SERVICE_ACCOUNT_KEY_FILE` |
+| `GOOGLE_OAUTH_CLIENT_ID` / `_CLIENT_SECRET` / `_REFRESH_TOKEN` | Drive access as the file owner (`npm run drive:authorize`) |
+| `GOOGLE_SERVICE_ACCOUNT_EMAIL` / `_PRIVATE_KEY` / `_KEY_FILE` | Alternative: service-account credentials |
 | `SYNC_INTERVAL_SECONDS` | Poll interval (default 30, min 10) |
+| `GEMINI_API_KEY`, `GEMINI_MODEL`, `GEMINI_FALLBACK_MODELS` | AI analysis (optional; default model `gemini-flash-latest` + fallbacks) |
 | `CORS_ORIGIN`, `PORT` | Server settings |
 
 | Frontend (`frontend/.env.local`) | Purpose |
 |---|---|
 | `NEXTAUTH_URL`, `NEXTAUTH_SECRET` | NextAuth config |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | OAuth client |
-| `ALLOWED_EMAIL_DOMAINS`, `ALLOWED_EMAILS` | Sign-in allowlist (default `salasartechno.com`) |
+| `ALLOWED_EMAILS`, `ALLOWED_EMAIL_DOMAINS` | Sign-in allowlist. Currently the two named accounts only; empty lists = nobody |
+| `ENABLE_DIRECT_SIGNIN` | `true` enables password-less sign-in as the first allowed email, **local development only** (ignored in production builds) |
 | `BACKEND_URL`, `BACKEND_API_KEY` | Where the proxy forwards to, and the shared key |
 
 ## API
@@ -138,6 +144,7 @@ All `/api/*` routes need the `x-api-key` header. The browser reaches them throug
 | GET | `/api/officer-return/years` | Financial years available |
 | GET | `/api/officer-return/overview?fy=` | Annual view: KPIs, trend, breakdowns, checks |
 | GET | `/api/officer-return/months/:month?fy=` | One month (`apr`…`mar`): parsed sections + KPIs + checks |
+| GET | `/api/officer-return/insights?period=annual\|sep&refresh=1` | Gemini analysis (cached per data hash; `refresh=1` regenerates) |
 | GET | `/api/sync/status` | Source, last check/sync/change, error, history |
 | POST | `/api/sync` `{ force? }` | Sync now |
 | GET | `/api/events` | SSE: `sync-started`, `sync-completed`, `sync-failed` |

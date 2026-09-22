@@ -155,6 +155,30 @@ export interface MonthReturn {
   updatedAt: string;
 }
 
+export type Priority = 'high' | 'medium' | 'low';
+
+export interface AiInsight {
+  headline: string;
+  summary: string;
+  healthScore: number;
+  keyMetrics: { label: string; value: string; note: string }[];
+  highlights: { title: string; detail: string }[];
+  risks: { title: string; detail: string; severity: Priority }[];
+  recommendations: { action: string; rationale: string; priority: Priority }[];
+}
+
+export type InsightResponse =
+  | { enabled: false; insight: null }
+  | {
+      enabled: true;
+      cached: boolean;
+      period: Period;
+      fy: string;
+      model: string;
+      generatedAt: string;
+      insight: AiInsight;
+    };
+
 export interface SyncStatus {
   source: 'drive' | 'local';
   status: 'idle' | 'syncing' | 'error';

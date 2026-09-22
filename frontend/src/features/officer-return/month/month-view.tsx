@@ -11,6 +11,7 @@ import { toneForRate } from '@/components/ui/meter';
 import { DashboardSkeleton, EmptyState, ErrorState } from '@/components/ui/states';
 import { formatNumber, formatPercent } from '@/lib/format';
 import { DataChecksPanel } from '../shared/data-checks-panel';
+import { AiInsightsCard } from '../shared/ai-insights-card';
 import { MONTH_LABELS } from '../periods';
 import { ReturnDetailsCard } from './return-details-card';
 import { WorkforceSection } from './sections/workforce-section';
@@ -86,6 +87,8 @@ export function MonthView({ month, overview }: { month: MonthKey; overview: Over
           detail={`${k.trainingSessions} programmes`}
         />
       </div>
+
+      <AiInsightsCard period={month} className="lg:col-span-12" />
 
       {data.checks.length > 0 && <DataChecksPanel checks={data.checks} className="lg:col-span-12" />}
 

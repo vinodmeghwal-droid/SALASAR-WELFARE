@@ -7,20 +7,29 @@ import { ChartColumn, LoaderCircle, RefreshCw, ShieldCheck, TriangleAlert, UserC
 import { Logo } from '@/components/brand/logo';
 
 const ERRORS: Record<string, string> = {
-  AccessDenied: 'This Google account is not authorised. You can sign in directly below.',
-  OAuthSignin: 'Could not start Google sign-in. You can sign in directly below.',
-  OAuthCallback: 'Google sign-in was interrupted. You can sign in directly below.',
-  Configuration: 'Google OAuth is unconfigured or failed. Use direct sign-in below.',
-  Default: 'Sign-in failed. You can sign in directly below.',
+  AccessDenied: 'This account is not authorised for the HR Welfare dashboard.',
+  OAuthSignin: 'Could not start Google sign-in. Please try again.',
+  OAuthCallback: 'Google sign-in was interrupted. Please try again.',
+  Configuration: 'Google sign-in is not configured yet. Contact the administrator.',
+  CredentialsSignin: 'Direct sign-in is only available for authorised accounts.',
+  Default: 'Sign-in failed. Please try again.',
 };
 
 const FEATURES = [
   { icon: ChartColumn, text: 'Monthly & annual welfare analytics' },
   { icon: RefreshCw, text: 'Live sync with the Google Drive workbook' },
-  { icon: ShieldCheck, text: 'Direct sign-in & Google OAuth options' },
+  { icon: ShieldCheck, text: 'Authorised accounts only' },
 ];
 
-export function LoginCard({ callbackUrl, error }: { callbackUrl: string; error?: string }) {
+export function LoginCard({
+  callbackUrl,
+  error,
+  directSignIn,
+}: {
+  callbackUrl: string;
+  error?: string;
+  directSignIn: boolean;
+}) {
   const [loadingDirect, setLoadingDirect] = useState(false);
   const [loadingGoogle, setLoadingGoogle] = useState(false);
 
@@ -31,11 +40,7 @@ export function LoginCard({ callbackUrl, error }: { callbackUrl: string; error?:
 
   const handleGoogleSignIn = async () => {
     setLoadingGoogle(true);
-    try {
-      await signIn('google', { callbackUrl });
-    } catch {
-      await handleDirectSignIn();
-    }
+    await signIn('google', { callbackUrl });
   };
 
   return (
@@ -58,26 +63,33 @@ export function LoginCard({ callbackUrl, error }: { callbackUrl: string; error?:
 
       <div className="mt-8 flex flex-col gap-3">
         <button
-          onClick={handleDirectSignIn}
-          disabled={loadingDirect || loadingGoogle}
-          className="flex h-11 w-full items-center justify-center gap-2.5 rounded-xl bg-accent px-4 text-sm font-medium text-accent-ink transition hover:opacity-90 active:scale-[0.99] disabled:opacity-70 cursor-pointer"
-        >
-          {loadingDirect ? (
-            <LoaderCircle className="size-4 animate-spin" aria-hidden />
-          ) : (
-            <UserCheck className="size-4" aria-hidden />
-          )}
-          {loadingDirect ? 'Signing in…' : 'Direct Sign In (Default)'}
-        </button>
-
-        <button
           onClick={handleGoogleSignIn}
           disabled={loadingDirect || loadingGoogle}
-          className="flex h-11 w-full items-center justify-center gap-3 rounded-xl border border-line-strong bg-surface text-sm font-medium text-ink transition hover:bg-surface-2 active:scale-[0.99] disabled:opacity-70 cursor-pointer"
+          className="flex h-11 w-full cursor-pointer items-center justify-center gap-3 rounded-xl border border-line-strong bg-surface text-sm font-medium text-ink transition hover:bg-surface-2 active:scale-[0.99] disabled:opacity-70"
         >
           {loadingGoogle ? <LoaderCircle className="size-4 animate-spin" aria-hidden /> : <GoogleMark />}
           {loadingGoogle ? 'Redirecting to Google…' : 'Continue with Google'}
         </button>
+
+        {directSignIn && (
+          <>
+            <button
+              onClick={handleDirectSignIn}
+              disabled={loadingDirect || loadingGoogle}
+              className="flex h-11 w-full cursor-pointer items-center justify-center gap-2.5 rounded-xl bg-accent px-4 text-sm font-medium text-white transition hover:opacity-90 active:scale-[0.99] disabled:opacity-70"
+            >
+              {loadingDirect ? (
+                <LoaderCircle className="size-4 animate-spin" aria-hidden />
+              ) : (
+                <UserCheck className="size-4" aria-hidden />
+              )}
+              {loadingDirect ? 'Signing in…' : 'Direct sign-in'}
+            </button>
+            <p className="text-center text-xs text-muted">
+              Development only — disabled in production builds.
+            </p>
+          </>
+        )}
       </div>
 
       <ul className="mt-8 space-y-2.5 border-t border-line pt-6">

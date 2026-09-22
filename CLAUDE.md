@@ -8,9 +8,13 @@ HR Welfare dashboard → sub-topic "Officer Return". Visualises the monthly Welf
   - Reads: `services/officerReturnService` → `domain/officerReturn/annual.buildAnnualOverview` (computed per request from the 12 MonthlyReturn docs).
   - `parsers/officerReturn/schema.js` = all workbook knowledge (month order, section title regexes, header→field map, numeric/date fields). Edit here first when the sheet changes.
   - `domain/` is pure (no I/O); unit-tested in `test/officerReturn.test.js` against `test/fixtures/officer-return-2026-27.xlsx`.
+  - AI: `services/insightService` → `domain/officerReturn/insightPrompt` (system prompt, JSON schema, aggregated context, no names/addresses) → `lib/gemini` (REST, structured output, falls back across `GEMINI_MODEL` + `GEMINI_FALLBACK_MODELS` on 429/5xx/404) → cached in `AiInsight` by `hashOf(context)`. `GET /api/officer-return/insights?period=`.
+  - Drive auth: `sources/driveSource` uses an OAuth refresh token for the file owner (`scripts/authorize-drive.js`, `npm run drive:authorize`) if `GOOGLE_OAUTH_*` are set, else a service account.
+  - `parsers/workbookReader` retries without `xl/drawings/*` when exceljs chokes on drawing parts. Manpower `closing` is derived when its formula has no cached value.
 - `frontend/` Next 16 App Router, TS, Tailwind 4 (CSS-first, tokens in `src/app/globals.css`), next-auth v4 (Google), SWR, Recharts 3, motion (`motion/react`), lucide-react.
   - Browser → `/api/backend/[...path]` (session check, adds `x-api-key`, streams) → backend. Never call the backend from the client directly.
-  - `src/proxy.ts` = Next 16 middleware (auth redirect). `src/lib/auth.ts` = NextAuth options + email allowlist.
+  - `src/proxy.ts` = Next 16 middleware (auth redirect). `src/lib/auth.ts` = NextAuth options + email allowlist (fails closed when empty). Credentials "Direct sign-in" exists only when `ENABLE_DIRECT_SIGNIN=true` AND not production, and still checks the allowlist. Never add a hardcoded secret fallback.
+  - AI card: `features/officer-return/shared/ai-insights-card.tsx` (`useInsights(period)`), placed after the KPI tiles in annual and month views.
   - Page: `app/(dashboard)/hr-welfare/officer-return/page.tsx` → `features/officer-return/officer-return-dashboard.tsx` (period state ↔ `?period=`), `annual/*`, `month/month-view.tsx` + `month/sections/*`.
   - Live updates: `providers/live-sync-provider.tsx` (EventSource → `mutate(isBackendKey)` + toast).
   - Charts: `components/charts/{bar-chart,month-columns,donut-chart,chart-card}.tsx`. Colors from `lib/chart-palette.ts` via `useChartPalette()` (literal hex; SVG attrs can't use CSS vars).
@@ -41,9 +45,9 @@ docker compose up -d   # local MongoDB
 ```
 
 ## Env
-backend/.env: MONGODB_URI, INTERNAL_API_KEY, DATA_SOURCE(drive|local), DRIVE_FILE_ID, GOOGLE_SERVICE_ACCOUNT_EMAIL + _PRIVATE_KEY (or _KEY_FILE), LOCAL_WORKBOOK_PATH, SYNC_INTERVAL_SECONDS.
-frontend/.env.local: NEXTAUTH_URL, NEXTAUTH_SECRET, GOOGLE_CLIENT_ID/SECRET, ALLOWED_EMAIL_DOMAINS, ALLOWED_EMAILS, BACKEND_URL, BACKEND_API_KEY (= INTERNAL_API_KEY).
-The Drive file must be shared with the service-account email (Viewer).
+backend/.env: MONGODB_URI (Atlas, db `hr-welfare`), INTERNAL_API_KEY, DATA_SOURCE(drive|local), DRIVE_FILE_ID, GOOGLE_OAUTH_CLIENT_ID/_SECRET/_REFRESH_TOKEN (or GOOGLE_SERVICE_ACCOUNT_*), LOCAL_WORKBOOK_PATH, SYNC_INTERVAL_SECONDS, GEMINI_API_KEY, GEMINI_MODEL, GEMINI_FALLBACK_MODELS.
+frontend/.env.local: NEXTAUTH_URL, NEXTAUTH_SECRET, GOOGLE_CLIENT_ID/SECRET, ALLOWED_EMAILS (vinod.meghwal@salasartechno.com, ambeydeep8052@gmail.com), ALLOWED_EMAIL_DOMAINS, ENABLE_DIRECT_SIGNIN, BACKEND_URL, BACKEND_API_KEY (= INTERNAL_API_KEY).
+Workbook owner = vinod.meghwal@salasartechno.com (a user account, not a service account).
 
 ## Adding a field end-to-end
 schema.js (map header/label) → kpis.js (compute) → annual.js TREND_KPIS/FLOW_KPIS if trended → test → types/officer-return.ts → UI section.

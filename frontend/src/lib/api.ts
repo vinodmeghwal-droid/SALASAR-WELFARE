@@ -1,4 +1,4 @@
-import type { MonthKey } from '@/types/officer-return';
+import type { MonthKey, Period } from '@/types/officer-return';
 
 /** All browser → backend traffic goes through the authenticated Next.js proxy. */
 const BASE = '/api/backend';
@@ -6,6 +6,8 @@ const BASE = '/api/backend';
 export const endpoints = {
   overview: `${BASE}/officer-return/overview`,
   month: (month: MonthKey) => `${BASE}/officer-return/months/${month}`,
+  insights: (period: Period, refresh = false) =>
+    `${BASE}/officer-return/insights?period=${period}${refresh ? '&refresh=1' : ''}`,
   syncStatus: `${BASE}/sync/status`,
   sync: `${BASE}/sync`,
   events: `${BASE}/events`,

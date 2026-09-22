@@ -22,6 +22,7 @@ import { DonutChart } from '@/components/charts/donut-chart';
 import { useChartPalette } from '@/components/charts/use-chart-palette';
 import { formatNumber, formatPercent } from '@/lib/format';
 import { DataChecksPanel } from '../shared/data-checks-panel';
+import { AiInsightsCard } from '../shared/ai-insights-card';
 import { SubmissionProgress } from './submission-progress';
 import { KpiMatrix } from './kpi-matrix';
 
@@ -90,6 +91,8 @@ export function AnnualView({ overview, onSelectMonth }: { overview: Overview; on
           detail={`${formatPercent(snapshot?.contractorComplianceRate)} contractor compliance · ${asOf}`}
         />
       </div>
+
+      {overview.submittedCount > 0 && <AiInsightsCard period="annual" className="lg:col-span-12" />}
 
       <SubmissionProgress months={overview.months} onSelect={onSelectMonth} className="lg:col-span-12" />
 

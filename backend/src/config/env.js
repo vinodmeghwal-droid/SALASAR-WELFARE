@@ -22,17 +22,29 @@ const schema = z
     GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY: z.string().optional(),
     GOOGLE_SERVICE_ACCOUNT_KEY_FILE: z.string().optional(),
     LOCAL_WORKBOOK_PATH: z.string().optional(),
+    // Alternative to a service account: read Drive as the file owner via an OAuth refresh token
+    // (obtain it with `npm run drive:authorize`).
+    GOOGLE_OAUTH_CLIENT_ID: z.string().optional(),
+    GOOGLE_OAUTH_CLIENT_SECRET: z.string().optional(),
+    GOOGLE_OAUTH_REFRESH_TOKEN: z.string().optional(),
 
     SYNC_INTERVAL_SECONDS: z.coerce.number().int().min(10).default(30),
+
+    // AI insights (optional). Without a key the insights endpoint reports "not configured".
+    GEMINI_API_KEY: z.string().optional(),
+    GEMINI_MODEL: z.string().default('gemini-flash-latest'),
+    GEMINI_FALLBACK_MODELS: z.string().default('gemini-3.8-flash,gemini-3.5-flash,gemini-flash-lite-latest'),
   })
   .superRefine((env, ctx) => {
     if (env.DATA_SOURCE === 'drive') {
-      const hasInline = env.GOOGLE_SERVICE_ACCOUNT_EMAIL && env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY;
-      if (!hasInline && !env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE) {
+      const hasServiceAccount =
+        (env.GOOGLE_SERVICE_ACCOUNT_EMAIL && env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY) || env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE;
+      const hasOAuth = env.GOOGLE_OAUTH_CLIENT_ID && env.GOOGLE_OAUTH_CLIENT_SECRET && env.GOOGLE_OAUTH_REFRESH_TOKEN;
+      if (!hasServiceAccount && !hasOAuth) {
         ctx.addIssue({
           code: 'custom',
           message:
-            'DATA_SOURCE=drive needs GOOGLE_SERVICE_ACCOUNT_EMAIL + GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY, or GOOGLE_SERVICE_ACCOUNT_KEY_FILE',
+            'DATA_SOURCE=drive needs either GOOGLE_OAUTH_CLIENT_ID + _CLIENT_SECRET + _REFRESH_TOKEN (npm run drive:authorize), or a service account (GOOGLE_SERVICE_ACCOUNT_EMAIL + _PRIVATE_KEY, or _KEY_FILE)',
         });
       }
     }

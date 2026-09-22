@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { authOptions, directSignInEnabled } from '@/lib/auth';
 import { LoginCard } from './login-card';
 
 export const metadata: Metadata = { title: 'Sign in' };
@@ -23,7 +23,7 @@ export default async function LoginPage({
         <div className="absolute -top-40 left-1/2 size-[640px] -translate-x-1/2 rounded-full bg-accent/10 blur-3xl" />
         <div className="absolute -bottom-48 -right-24 size-[420px] rounded-full bg-[#1baf7a]/10 blur-3xl" />
       </div>
-      <LoginCard callbackUrl={safeCallback} error={error} />
+      <LoginCard callbackUrl={safeCallback} error={error} directSignIn={directSignInEnabled} />
     </main>
   );
 }

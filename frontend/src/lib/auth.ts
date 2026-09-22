@@ -11,35 +11,40 @@ const list = (value?: string) =>
 const allowedDomains = list(process.env.ALLOWED_EMAIL_DOMAINS);
 const allowedEmails = list(process.env.ALLOWED_EMAILS);
 
-/** Empty allowlists = any verified Google account may sign in. */
+/** Fails closed: with both allowlists empty, nobody can sign in. */
 export function isEmailAllowed(email?: string | null) {
   if (!email) return false;
-  if (!allowedDomains.length && !allowedEmails.length) return true;
   const normalized = email.toLowerCase();
   return allowedEmails.includes(normalized) || allowedDomains.includes(normalized.split('@')[1] ?? '');
 }
 
+/**
+ * Password-less "Direct Sign In" — a local-development convenience until Google OAuth is
+ * configured. Needs ENABLE_DIRECT_SIGNIN=true and is always off in production builds.
+ */
+export const directSignInEnabled =
+  process.env.ENABLE_DIRECT_SIGNIN === 'true' && process.env.NODE_ENV !== 'production';
+
 export const authOptions: NextAuthOptions = {
-  secret: process.env.NEXTAUTH_SECRET || 'salasar-welfare-default-jwt-secret-2026',
+  secret: process.env.NEXTAUTH_SECRET,
   providers: [
-    CredentialsProvider({
-      id: 'credentials',
-      name: 'Direct Sign In',
-      credentials: {
-        email: { label: 'Email', type: 'email' },
-      },
-      async authorize(credentials) {
-        const defaultEmail =
-          allowedEmails[0] ?? (allowedDomains[0] ? `officer@${allowedDomains[0]}` : 'officer@salasartechno.com');
-        const email = credentials?.email?.trim() || defaultEmail;
-        return {
-          id: 'default-user',
-          name: 'Welfare Officer',
-          email,
-          image: null,
-        };
-      },
-    }),
+    ...(directSignInEnabled
+      ? [
+          CredentialsProvider({
+            id: 'credentials',
+            name: 'Direct Sign In (development)',
+            credentials: {
+              email: { label: 'Email', type: 'email' },
+            },
+            async authorize(credentials) {
+              // Still restricted to the allowlist; defaults to its first address.
+              const email = credentials?.email?.trim().toLowerCase() || allowedEmails[0];
+              if (!isEmailAllowed(email)) return null;
+              return { id: email, name: 'Welfare Officer', email, image: null };
+            },
+          }),
+        ]
+      : []),
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID ?? '',
       clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? '',
@@ -56,7 +61,7 @@ export const authOptions: NextAuthOptions = {
   pages: { signIn: '/login', error: '/login' },
   callbacks: {
     async signIn({ account, profile }) {
-      if (account?.provider === 'credentials') return true;
+      if (account?.provider === 'credentials') return directSignInEnabled; // authorize() already checked the allowlist
       const googleProfile = profile as { email?: string; email_verified?: boolean } | undefined;
       return Boolean(googleProfile?.email_verified) && isEmailAllowed(googleProfile?.email);
     },
