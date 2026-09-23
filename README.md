@@ -2,7 +2,7 @@
 
 An analytics dashboard for Salasar Techno Engineering's monthly **Welfare Officer Return**. The officer keeps filling in the Excel workbook on Google Drive as usual. The dashboard picks up each change within about 30 seconds and turns it into charts, KPIs and data-quality checks.
 
-- **Module:** HR Welfare → **Sub-topic:** Officer Return
+- **Module:** HR Welfare → **Sub-topics:** Officer Return · Accident Tracker
 - **Views:** Annual Summary (year to date) plus one tab per month, April to March (matching the workbook tabs)
 - **Sign-in:** Google OAuth, limited to an email allowlist (`ALLOWED_EMAILS`)
 - **Stack:** Next.js 16 · Tailwind CSS 4 · Recharts · Motion | Node.js · Express 5 · MongoDB Atlas (Mongoose) · Google Drive API · Gemini API | Python (workbook inspection tool)
@@ -16,6 +16,7 @@ An analytics dashboard for Salasar Techno Engineering's monthly **Welfare Office
 | **Annual Summary** | 8 KPI tiles, a 12-month submission tracker, monthly trend charts (workload, headcount by gender, joinings vs separations), year-to-date breakdowns (grievances, accidents, health, training, activities), compliance meters, a KPI-by-month table, and a data-checks panel |
 | **Monthly return** | Every section of the sheet (A–J) visualised: manpower movement and gender split, facility cards, health and accident charts, grievance resolution, activities, contractor compliance matrix, statutory checklist, and a training calendar |
 | **Live sync** | The backend polls Drive metadata every 30 s. When the file changes it downloads, re-parses and stores the data, then pushes a Server-Sent Event, and open dashboards refresh themselves with a toast naming the changed months. A **Sync now** button forces a sync immediately. |
+| **Accident Tracker** | Safety KPIs (accidents, LTI, fatalities, LTIFR, severity rate, near misses), monthly trends across the workbook's May→April year, breakdowns by accident type, department, employment type and injury type, corrective-action (CAPA) status, and a searchable incident register where each row expands to root cause, corrective action and closure detail |
 | **AI analysis (Gemini)** | Each view (annual and each submitted month) gets an AI card: a 0–100 health score, headline and summary, key figures, what's going well, risks and data issues ranked by severity, and prioritised actions. It uses only the numbers on the page (no names or addresses are sent), is cached per data version, and regenerates automatically when the workbook changes. It falls back across models when Gemini is overloaded. |
 | **Empty months** | Months that are still blank templates show an "awaiting data" state. They fill in automatically once the officer enters data. |
 | **Data checks** | Flags inconsistencies in the workbook, e.g. the manpower TOTAL row counting workers twice, the Annual Summary tab reading the wrong rows, and ambiguous dates |
@@ -144,9 +145,11 @@ All `/api/*` routes need the `x-api-key` header. The browser reaches them throug
 | GET | `/api/officer-return/years` | Financial years available |
 | GET | `/api/officer-return/overview?fy=` | Annual view: KPIs, trend, breakdowns, checks |
 | GET | `/api/officer-return/months/:month?fy=` | One month (`apr`…`mar`): parsed sections + KPIs + checks |
-| GET | `/api/officer-return/insights?period=annual\|sep&refresh=1` | Gemini analysis (cached per data hash; `refresh=1` regenerates) |
-| GET | `/api/sync/status` | Source, last check/sync/change, error, history |
-| POST | `/api/sync` `{ force? }` | Sync now |
+| GET | `/api/accident-tracker/overview?fy=` | Safety KPIs, monthly series, breakdowns, CAPA, checks |
+| GET | `/api/accident-tracker/incidents?month=&type=&status=&department=` | The incident register, optionally filtered |
+| GET | `/api/insights?dataset=&period=&refresh=1` | Gemini analysis (cached per data hash; `refresh=1` regenerates) |
+| GET | `/api/sync/status` | One entry per workbook: source, last check/sync/change, error, history |
+| POST | `/api/sync` `{ dataset?, force? }` | Sync now (all workbooks, or one) |
 | GET | `/api/events` | SSE: `sync-started`, `sync-completed`, `sync-failed` |
 
 ## Data notes
@@ -158,9 +161,17 @@ Checks of the 2026-27 workbook turned up these issues. The dashboard works aroun
 3. **Header "Total Workers" (700)** differs from the manpower statement (124). This may be intentional (all staff vs workers covered by the return), so it is flagged as a note, not a warning.
 4. **Training dates**: some Sep dates were entered as `05-10-2026` and Excel read them as 10 May (month-day). Entering dates as `05-Oct-2026` avoids this.
 
+And in the **Accident Tracker** workbook:
+
+5. **The one recorded incident is flagged both "Near Miss = Y" and as an injury** (LTI, first aid, 20 man-days lost). A near miss causes no injury, so the workbook counts the same event in several buckets. Flag one or the other.
+6. **The Dashboard's "KEY RATES" block always reads zero.** Its formulas point at empty cells beside the merged tiles (B7/B9/C7/G7). The dashboard computes LTIFR, severity and the ratios from the register instead.
+7. **"Accident Rate / 100 Workers" cannot be calculated**: the formula divides by `Dashboard!B6`, which is empty, and no worker headcount is recorded. Add a monthly worker count to enable it.
+8. **Target and closure dates precede the accident date** (accident 08-May-2026, target 08-Jan-2026), another day/month swap.
+9. **Man-hours worked is a monthly figure entered on each incident row.** The workbook's Monthly KPI sums it, so with several incidents in one month the denominator inflates and LTIFR is understated. The dashboard uses the single monthly figure.
+
 ## Adding things
 
-- **A new sub-topic** under HR Welfare: add it to `frontend/src/config/navigation.ts` and create `frontend/src/app/(dashboard)/hr-welfare/<slug>/page.tsx`.
+- **A new sub-topic** under HR Welfare: add it to `frontend/src/config/navigation.ts` and create `frontend/src/app/(dashboard)/hr-welfare/<slug>/page.tsx`. If it has its own workbook, add a dataset entry in `backend/src/config/datasets.js` (with a parser + ingest) and whitelist its API root in `frontend/src/app/api/backend/[...path]/route.ts`.
 - **A new workbook field**: extend `backend/src/parsers/officerReturn/schema.js` (header or section matcher), compute it in `domain/officerReturn/kpis.js`, add it to `frontend/src/types/officer-return.ts`, then render it.
 - **A new financial year**: point `DRIVE_FILE_ID` at the new workbook. Data is stored per FY, and `?fy=` selects one.
 

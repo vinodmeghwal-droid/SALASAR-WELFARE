@@ -41,23 +41,28 @@ export function LiveSyncProvider({ children }: { children: React.ReactNode }) {
     source.addEventListener('sync-started', () => setState((s) => ({ ...s, syncing: true })));
 
     source.addEventListener('sync-completed', (event) => {
-      const data = JSON.parse((event as MessageEvent).data) as { changedMonths: MonthKey[]; syncedAt: string };
+      const data = JSON.parse((event as MessageEvent).data) as {
+        label?: string;
+        changedItems: string[];
+        syncedAt: string;
+      };
       setState((s) => ({ ...s, syncing: false, lastEventAt: data.syncedAt }));
       mutate(isBackendKey);
-      if (data.changedMonths.length) {
+      if (data.changedItems.length) {
+        const months = data.changedItems.filter((i) => i in MONTH_NAMES).map((i) => MONTH_NAMES[i as MonthKey]);
         toast({
           tone: 'success',
-          title: 'Dashboard updated from Google Drive',
-          description: `Changes in ${data.changedMonths.map((m) => MONTH_NAMES[m]).join(', ')}`,
+          title: `${data.label ?? 'Dashboard'} updated from Google Drive`,
+          description: months.length ? `Changes in ${months.join(', ')}` : 'New data synced',
         });
       }
     });
 
     source.addEventListener('sync-failed', (event) => {
-      const data = JSON.parse((event as MessageEvent).data) as { error: string };
+      const data = JSON.parse((event as MessageEvent).data) as { label?: string; error: string };
       setState((s) => ({ ...s, syncing: false }));
       mutate(endpoints.syncStatus);
-      toast({ tone: 'error', title: 'Sync from Google Drive failed', description: data.error });
+      toast({ tone: 'error', title: `${data.label ?? 'Sync'} failed`, description: data.error });
     });
 
     return () => source.close();

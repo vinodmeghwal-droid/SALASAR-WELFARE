@@ -2,7 +2,6 @@
 
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { formatNumber } from '@/lib/format';
-import type { TrendPoint } from '@/types/officer-return';
 import { ChartTooltip } from './chart-tooltip';
 import type { SeriesSpec } from './bar-chart';
 import { useChartPalette } from './use-chart-palette';
@@ -11,6 +10,14 @@ import { useChartPalette } from './use-chart-palette';
  * April → March columns. Months without a submitted return have null values (a gap, not
  * a zero bar), a muted tick, and a "not submitted" tooltip.
  */
+/** A month of any financial year: an id, a short label, and whether data exists for it. */
+export interface MonthPoint {
+  month: string;
+  label: string;
+  hasData: boolean;
+  [metric: string]: string | number | boolean | null | undefined;
+}
+
 export function MonthColumns({
   data,
   series,
@@ -19,7 +26,7 @@ export function MonthColumns({
   valueFormatter = formatNumber,
   ariaLabel,
 }: {
-  data: TrendPoint[];
+  data: MonthPoint[];
   series: SeriesSpec[];
   stacked?: boolean;
   height?: number;

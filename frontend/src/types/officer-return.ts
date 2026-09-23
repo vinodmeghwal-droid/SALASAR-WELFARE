@@ -39,7 +39,8 @@ export interface MonthKpis {
 export interface DataCheck {
   id: string;
   severity: 'warning' | 'info';
-  month?: MonthKey;
+  /** Officer Return: "sep". Accident tracker: "may-26". */
+  month?: string;
   title: string;
   detail: string;
 }
@@ -179,10 +180,13 @@ export type InsightResponse =
       insight: AiInsight;
     };
 
-export interface SyncStatus {
+export interface DatasetSyncStatus {
+  key: 'officer-return' | 'accident-tracker';
+  label: string;
   source: 'drive' | 'local';
   status: 'idle' | 'syncing' | 'error';
   error: string | null;
+  fileId: string | null;
   fileName: string | null;
   webViewLink: string | null;
   fy: string | null;
@@ -190,4 +194,9 @@ export interface SyncStatus {
   lastCheckedAt: string | null;
   lastSyncedAt: string | null;
   lastChangeAt: string | null;
+}
+
+/** GET /api/sync/status — one entry per synced workbook. */
+export interface SyncStatus {
+  datasets: DatasetSyncStatus[];
 }

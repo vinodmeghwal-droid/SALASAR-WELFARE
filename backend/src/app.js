@@ -6,7 +6,7 @@ import { requireApiKey } from './middleware/requireApiKey.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { createApiRouter } from './routes/index.js';
 
-export function createApp({ env, syncService, insightService }) {
+export function createApp({ env, syncRegistry, insightService }) {
   const app = express();
 
   app.disable('x-powered-by');
@@ -19,7 +19,7 @@ export function createApp({ env, syncService, insightService }) {
     res.status(ready ? 200 : 503).json({ ok: ready, database: ready ? 'connected' : 'disconnected' });
   });
 
-  app.use('/api', requireApiKey(env.INTERNAL_API_KEY), createApiRouter({ syncService, insightService }));
+  app.use('/api', requireApiKey(env.INTERNAL_API_KEY), createApiRouter({ syncRegistry, insightService }));
 
   app.use(notFoundHandler);
   app.use(errorHandler);

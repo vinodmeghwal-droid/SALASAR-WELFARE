@@ -5,7 +5,8 @@ const { Schema } = mongoose;
 /** Singleton per synced file: what revision we last ingested and how the last sync went. */
 const syncStateSchema = new Schema(
   {
-    key: { type: String, required: true, unique: true },
+    key: { type: String, required: true, unique: true }, // dataset key
+    label: String,
     source: String, // "drive" | "local"
     fileId: String,
     fileName: String,

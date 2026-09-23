@@ -7,34 +7,45 @@ import { useLiveSync } from '@/providers/live-sync-provider';
 import { timeAgo } from '@/lib/format';
 import { LiveDot } from './live-dot';
 
-/** Sidebar footer: where the data comes from and how fresh it is. */
+/** Sidebar footer: where the data comes from and how fresh each workbook is. */
 export function SyncStatusCard() {
   const { data } = useSyncStatus();
   const { connection, syncing } = useLiveSync();
   const now = useNow(15_000);
 
-  const errored = data?.status === 'error';
-  const label = syncing || data?.status === 'syncing' ? 'Syncing…' : errored ? 'Sync error' : connection === 'live' ? 'Live' : 'Reconnecting…';
+  const datasets = data?.datasets ?? [];
+  const errored = datasets.some((d) => d.status === 'error');
+  const busy = syncing || datasets.some((d) => d.status === 'syncing');
+  const label = busy ? 'Syncing…' : errored ? 'Sync error' : connection === 'live' ? 'Live' : 'Reconnecting…';
+  const source = datasets[0]?.source === 'local' ? 'Local files' : 'Google Drive';
 
   return (
     <div className="rounded-xl border border-line bg-surface-2/60 p-3">
       <div className="flex items-center gap-2 text-xs font-medium text-ink">
-        <LiveDot state={errored ? 'error' : syncing ? 'syncing' : connection} />
+        <LiveDot state={errored ? 'error' : busy ? 'syncing' : connection} />
         {label}
-        <span className="ml-auto text-muted">{data?.source === 'local' ? 'Local file' : 'Google Drive'}</span>
+        <span className="ml-auto text-muted">{source}</span>
       </div>
-      <div className="mt-2 flex items-start gap-2">
-        <FileSpreadsheet className="mt-0.5 size-4 shrink-0 text-good-ink" aria-hidden />
-        <div className="min-w-0">
-          <p className="truncate text-xs text-ink-2" title={data?.fileName ?? undefined}>
-            {data?.fileName ?? 'Workbook'}
-          </p>
-          <p className="text-[11px] text-muted">
-            Edited {timeAgo(data?.sourceModifiedTime, now)} · checked {timeAgo(data?.lastCheckedAt, now)}
-          </p>
-        </div>
-      </div>
-      {errored && data?.error && <p className="mt-2 line-clamp-3 text-[11px] text-critical-ink">{data.error}</p>}
+
+      <ul className="mt-2 space-y-2">
+        {datasets.map((dataset) => (
+          <li key={dataset.key} className="flex items-start gap-2">
+            <FileSpreadsheet
+              className={`mt-0.5 size-4 shrink-0 ${dataset.status === 'error' ? 'text-critical-ink' : 'text-good-ink'}`}
+              aria-hidden
+            />
+            <div className="min-w-0">
+              <p className="truncate text-xs text-ink-2" title={dataset.fileName ?? dataset.label}>
+                {dataset.label}
+              </p>
+              <p className="text-[11px] text-muted">
+                Edited {timeAgo(dataset.sourceModifiedTime, now)} · checked {timeAgo(dataset.lastCheckedAt, now)}
+              </p>
+              {dataset.error && <p className="mt-0.5 line-clamp-2 text-[11px] text-critical-ink">{dataset.error}</p>}
+            </div>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

@@ -5,7 +5,7 @@ import { motion } from 'motion/react';
 import { useSWRConfig } from 'swr';
 import { CircleCheck, Lightbulb, RefreshCw, Sparkles, TriangleAlert } from 'lucide-react';
 import { useInsights } from '@/hooks/use-officer-return';
-import { endpoints, fetcher } from '@/lib/api';
+import { endpoints, fetcher, type DatasetKey } from '@/lib/api';
 import { Card } from '@/components/ui/card';
 import { Badge, type Tone } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/states';
@@ -17,8 +17,16 @@ import type { InsightResponse, Period, Priority } from '@/types/officer-return';
 const PRIORITY_TONE: Record<Priority, Tone> = { high: 'critical', medium: 'warning', low: 'neutral' };
 
 /** Gemini's narrative analysis of the figures on the current view. Hidden when AI is not configured. */
-export function AiInsightsCard({ period, className }: { period: Period; className?: string }) {
-  const { data, error, isLoading } = useInsights(period);
+export function AiInsightsCard({
+  period,
+  dataset = 'officer-return',
+  className,
+}: {
+  period: Period | string;
+  dataset?: DatasetKey;
+  className?: string;
+}) {
+  const { data, error, isLoading } = useInsights(dataset, period);
   const { mutate } = useSWRConfig();
   const toast = useToast();
   const [regenerating, setRegenerating] = useState(false);
@@ -28,8 +36,8 @@ export function AiInsightsCard({ period, className }: { period: Period; classNam
   async function regenerate() {
     setRegenerating(true);
     try {
-      const fresh = await fetcher<InsightResponse>(endpoints.insights(period, true));
-      await mutate(endpoints.insights(period), fresh, { revalidate: false });
+      const fresh = await fetcher<InsightResponse>(endpoints.insights(dataset, period, true));
+      await mutate(endpoints.insights(dataset, period), fresh, { revalidate: false });
     } catch (e) {
       toast({ tone: 'error', title: 'Could not regenerate the analysis', description: (e as Error).message });
     } finally {

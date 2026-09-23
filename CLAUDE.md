@@ -1,14 +1,16 @@
 # CLAUDE.md
 
-HR Welfare dashboard → sub-topic "Officer Return". Visualises the monthly Welfare Officer Return workbook (.xlsx on Google Drive), synced live. Two apps plus one tool; no shared packages.
+HR Welfare dashboard. Sub-topics: "Officer Return" (monthly welfare return) and "Accident Tracker" (safety/LTI register). Each is one .xlsx on Google Drive, synced live. Two apps plus one tool; no shared packages.
 
 ## Map
 - `backend/` Node ≥20 ESM, Express 5, Mongoose 9, exceljs, @googleapis/drive, zod. Plain JS.
-  - Flow: `jobs/syncScheduler` → `services/syncService.sync()` → `sources/*.getMetadata()` (revision) → if changed `download()` → `parsers/officerReturn/index.parseOfficerReturnWorkbook(buf)` → `domain/officerReturn/monthRecord.buildMonthRecord` (kpis + checks + contentHash) → Mongo upsert → `lib/eventBus` emit → SSE `/api/events`.
+  - Datasets: `config/datasets.js` lists every workbook (key, label, ingest, file id/local path) and builds one sync service each via `createSyncRegistry`. Add an entry to onboard a new sub-topic's workbook.
+  - Flow: `jobs/syncScheduler` (per dataset) → `services/syncService.sync()` → `sources/*.getMetadata()` (revision) → if changed `download()` → dataset's `services/ingest/*` (parse → domain record → Mongo upsert) → `lib/eventBus` emit → SSE `/api/events`. Events/logs/state carry the dataset key.
   - Reads: `services/officerReturnService` → `domain/officerReturn/annual.buildAnnualOverview` (computed per request from the 12 MonthlyReturn docs).
   - `parsers/officerReturn/schema.js` = all workbook knowledge (month order, section title regexes, header→field map, numeric/date fields). Edit here first when the sheet changes.
   - `domain/` is pure (no I/O); unit-tested in `test/officerReturn.test.js` against `test/fixtures/officer-return-2026-27.xlsx`.
-  - AI: `services/insightService` → `domain/officerReturn/insightPrompt` (system prompt, JSON schema, aggregated context, no names/addresses) → `lib/gemini` (REST, structured output, falls back across `GEMINI_MODEL` + `GEMINI_FALLBACK_MODELS` on 429/5xx/404) → cached in `AiInsight` by `hashOf(context)`. `GET /api/officer-return/insights?period=`.
+  - Accident tracker: `parsers/accidentTracker/*` (register rows + Monthly KPI + Dashboard) → `domain/accidentTracker/{kpis,dataChecks,record}.js` → one `AccidentReturn` doc per FY → `services/accidentTrackerService`. Routes `/api/accident-tracker/{years,overview,incidents}`.
+  - AI: `services/insightService` (datasets: officer-return | accident-tracker) → `domain/*/insightPrompt` (system prompt, JSON schema, aggregated context, no names/addresses) → `lib/gemini` (REST, structured output, falls back across `GEMINI_MODEL` + `GEMINI_FALLBACK_MODELS` on 429/5xx/404) → cached in `AiInsight` by `hashOf(context)`. `GET /api/insights?dataset=&period=`.
   - Drive auth: `sources/driveSource` uses an OAuth refresh token for the file owner (`scripts/authorize-drive.js`, `npm run drive:authorize`) if `GOOGLE_OAUTH_*` are set, else a service account.
   - `parsers/workbookReader` retries without `xl/drawings/*` when exceljs chokes on drawing parts. Manpower `closing` is derived when its formula has no cached value.
 - `frontend/` Next 16 App Router, TS, Tailwind 4 (CSS-first, tokens in `src/app/globals.css`), next-auth v4 (Google), SWR, Recharts 3, motion (`motion/react`), lucide-react.
@@ -19,9 +21,12 @@ HR Welfare dashboard → sub-topic "Officer Return". Visualises the monthly Welf
   - Live updates: `providers/live-sync-provider.tsx` (EventSource → `mutate(isBackendKey)` + toast).
   - Charts: `components/charts/{bar-chart,month-columns,donut-chart,chart-card}.tsx`. Colors from `lib/chart-palette.ts` via `useChartPalette()` (literal hex; SVG attrs can't use CSS vars).
   - Nav/sub-topics: `config/navigation.ts`. Sheet tab gids: `config/sheet-links.ts`.
+  - Accident UI: `features/accident-tracker/` (dashboard → `accident-view` + `incident-register`), page at `app/(dashboard)/hr-welfare/accident-tracker/`.
+  - The Next proxy only forwards whitelisted roots (`ALLOWED_ROOTS` in `app/api/backend/[...path]/route.ts`) — add new API roots there.
 - `tools/inspect_workbook.py` prints section row positions per sheet (finds layout drift).
 
 ## Domain rules (don't regress)
+### Officer Return
 - FY months are Apr→Mar (`monthIndex` 0 = Apr). Jan–Mar belong to FY start year + 1.
 - Locate sections by title regex, never by row number (Sep has an extra row after section D).
 - Headcount = sum of manpower rows with `group:'type'` (Permanent/Contract/Temporary/Apprentice). Gender rows are a second breakdown of the same people. The sheet's TOTAL row double counts them, so never use it.
@@ -29,6 +34,14 @@ HR Welfare dashboard → sub-topic "Officer Return". Visualises the monthly Welf
 - `safetyIncidents` = all accident rows except compensation/claim (matches sheet J "Accidents"). `inspections` = activities whose label contains "inspection".
 - `hasData` is based on numbers or named contractors only (template pre-fills header text and "Complied"/"Yes"). Blank months: trend values are `null` (gaps, not zeros), UI shows the "awaiting data" state.
 - Placeholder text ("Enter key observations…") is ignored.
+
+### Accident Tracker
+- This workbook's year runs **May→April**; months are ids like `may-26` (from "May-26" labels), never the officer-return month keys.
+- The "Accident Tracker" sheet is the source of truth; "Monthly KPI" and "Dashboard" are formula sheets kept only for cross-checks.
+- Man-hours worked is a **monthly** figure repeated on each incident row: use the largest distinct value per month (`monthManHours`), never the sum (the workbook's SUMIF double counts and understates LTIFR).
+- LTIFR = LTI × 1,000,000 ÷ man-hours; Severity = man-days lost × 1,000,000 ÷ man-hours.
+- `accidents` excludes rows whose Accident Type is "Near Miss"; a row flagged both near miss and injury is a data check, not a silent fix.
+- Rows with no date/name/type (stray "Sr No" values in the 500-row formula range) are not incidents.
 
 ## Conventions
 - Backend: ESM, named exports, factories (`createX({deps})`) for services with deps, pure functions in `domain/`. Errors: throw `HttpError`; Express 5 forwards async errors to `middleware/errorHandler`.
@@ -45,7 +58,7 @@ docker compose up -d   # local MongoDB
 ```
 
 ## Env
-backend/.env: MONGODB_URI (Atlas, db `hr-welfare`), INTERNAL_API_KEY, DATA_SOURCE(drive|local), DRIVE_FILE_ID, GOOGLE_OAUTH_CLIENT_ID/_SECRET/_REFRESH_TOKEN (or GOOGLE_SERVICE_ACCOUNT_*), LOCAL_WORKBOOK_PATH, SYNC_INTERVAL_SECONDS, GEMINI_API_KEY, GEMINI_MODEL, GEMINI_FALLBACK_MODELS.
+backend/.env: MONGODB_URI (Atlas, db `hr-welfare`), INTERNAL_API_KEY, DATA_SOURCE(drive|local), DRIVE_FILE_ID + ACCIDENT_DRIVE_FILE_ID, GOOGLE_OAUTH_CLIENT_ID/_SECRET/_REFRESH_TOKEN (or GOOGLE_SERVICE_ACCOUNT_*), LOCAL_WORKBOOK_PATH + ACCIDENT_LOCAL_WORKBOOK_PATH, SYNC_INTERVAL_SECONDS, GEMINI_API_KEY, GEMINI_MODEL, GEMINI_FALLBACK_MODELS.
 frontend/.env.local: NEXTAUTH_URL, NEXTAUTH_SECRET, GOOGLE_CLIENT_ID/SECRET, ALLOWED_EMAILS (vinod.meghwal@salasartechno.com, ambeydeep8052@gmail.com), ALLOWED_EMAIL_DOMAINS, ENABLE_DIRECT_SIGNIN, BACKEND_URL, BACKEND_API_KEY (= INTERNAL_API_KEY).
 Workbook owner = vinod.meghwal@salasartechno.com (a user account, not a service account).
 

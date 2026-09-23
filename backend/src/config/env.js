@@ -22,6 +22,8 @@ const schema = z
     GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY: z.string().optional(),
     GOOGLE_SERVICE_ACCOUNT_KEY_FILE: z.string().optional(),
     LOCAL_WORKBOOK_PATH: z.string().optional(),
+    ACCIDENT_DRIVE_FILE_ID: z.string().default('1Wp1VCKwV-epBvyBpohE_7e71_O5vMC2B'),
+    ACCIDENT_LOCAL_WORKBOOK_PATH: z.string().optional(),
     // Alternative to a service account: read Drive as the file owner via an OAuth refresh token
     // (obtain it with `npm run drive:authorize`).
     GOOGLE_OAUTH_CLIENT_ID: z.string().optional(),
@@ -48,8 +50,11 @@ const schema = z
         });
       }
     }
-    if (env.DATA_SOURCE === 'local' && !env.LOCAL_WORKBOOK_PATH) {
-      ctx.addIssue({ code: 'custom', message: 'DATA_SOURCE=local needs LOCAL_WORKBOOK_PATH' });
+    if (env.DATA_SOURCE === 'local' && !(env.LOCAL_WORKBOOK_PATH && env.ACCIDENT_LOCAL_WORKBOOK_PATH)) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'DATA_SOURCE=local needs LOCAL_WORKBOOK_PATH and ACCIDENT_LOCAL_WORKBOOK_PATH',
+      });
     }
   });
 
