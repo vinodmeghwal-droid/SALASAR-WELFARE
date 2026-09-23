@@ -92,8 +92,6 @@ export function AnnualView({ overview, onSelectMonth }: { overview: Overview; on
         />
       </div>
 
-      {overview.submittedCount > 0 && <AiInsightsCard period="annual" className="lg:col-span-12" />}
-
       <SubmissionProgress months={overview.months} onSelect={onSelectMonth} className="lg:col-span-12" />
 
       <SectionHeading title="Monthly trends" description="April → March. Months without a submitted return are left blank, not zero." />
@@ -351,6 +349,8 @@ export function AnnualView({ overview, onSelectMonth }: { overview: Overview; on
           <p className="whitespace-pre-line p-5 text-sm text-ink-2">{overview.observations}</p>
         </Card>
       )}
+
+      {overview.submittedCount > 0 && <AiInsightsCard period="annual" className="lg:col-span-12" />}
     </motion.div>
   );
 }

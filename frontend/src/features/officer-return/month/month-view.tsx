@@ -88,8 +88,6 @@ export function MonthView({ month, overview }: { month: MonthKey; overview: Over
         />
       </div>
 
-      <AiInsightsCard period={month} className="lg:col-span-12" />
-
       {data.checks.length > 0 && <DataChecksPanel checks={data.checks} className="lg:col-span-12" />}
 
       <SectionHeading letter="A" title="Manpower statement" description="Opening, joining, separation and closing by category" />
@@ -116,6 +114,8 @@ export function MonthView({ month, overview }: { month: MonthKey; overview: Over
           <p className="whitespace-pre-line">{data.remarks}</p>
         </motion.blockquote>
       )}
+
+      <AiInsightsCard period={month} className="lg:col-span-12" />
 
       <p className="flex items-center gap-1.5 text-xs text-muted lg:col-span-12">
         <Activity className="size-3.5" aria-hidden />
