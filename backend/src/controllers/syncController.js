@@ -1,15 +1,22 @@
 import { eventBus } from '../lib/eventBus.js';
+import { badRequest } from '../lib/httpError.js';
 
-export function createSyncController(syncService) {
+export function createSyncController(registry) {
   return {
+    /** GET /api/sync/status — one entry per synced workbook. */
     async status(req, res) {
-      res.json(await syncService.getStatus());
+      res.json({ datasets: await registry.statuses() });
     },
 
-    /** POST /api/sync { force?: boolean } — "Sync now" button. */
+    /** POST /api/sync { dataset?, force? } — "Sync now"; all workbooks unless one is named. */
     async trigger(req, res) {
-      const result = await syncService.sync({ trigger: 'manual', force: Boolean(req.body?.force) });
-      res.json(result);
+      const { dataset, force } = req.body ?? {};
+      if (dataset) {
+        const service = registry.get(dataset);
+        if (!service) throw badRequest(`Unknown dataset "${dataset}"`);
+        return res.json({ results: [await service.sync({ trigger: 'manual', force: Boolean(force) })] });
+      }
+      res.json({ results: await registry.syncAll({ trigger: 'manual', force: Boolean(force) }) });
     },
 
     /** GET /api/events — Server-Sent Events stream of sync lifecycle events. */

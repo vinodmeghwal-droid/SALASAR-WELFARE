@@ -9,7 +9,7 @@ import { authOptions } from '@/lib/auth';
  */
 export const dynamic = 'force-dynamic';
 
-const ALLOWED_ROOTS = new Set(['officer-return', 'sync', 'events']);
+const ALLOWED_ROOTS = new Set(['officer-return', 'accident-tracker', 'insights', 'sync', 'events']);
 
 async function forward(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const session = await getServerSession(authOptions);

@@ -1,14 +1,17 @@
-// Run one forced sync from the configured source into MongoDB, then exit.
-// Usage: npm run sync:once
+// Run one forced sync of every workbook into MongoDB, then exit.
+// Usage: npm run sync:once [-- <dataset-key>]
 import { env } from '../src/config/env.js';
 import { connectDatabase, disconnectDatabase } from '../src/config/db.js';
-import { createSource } from '../src/sources/index.js';
-import { createSyncService } from '../src/services/syncService.js';
+import { createDatasetRegistry } from '../src/config/datasets.js';
 
 await connectDatabase(env.MONGODB_URI);
 try {
-  const result = await createSyncService({ source: createSource(env) }).sync({ trigger: 'manual', force: true });
-  console.log(result);
+  const registry = createDatasetRegistry(env);
+  const only = process.argv[2];
+  const results = only
+    ? [await registry.get(only).sync({ trigger: 'manual', force: true })]
+    : await registry.syncAll({ trigger: 'manual', force: true });
+  console.log(results);
 } finally {
   await disconnectDatabase();
 }

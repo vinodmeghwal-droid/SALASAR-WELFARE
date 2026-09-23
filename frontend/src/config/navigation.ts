@@ -1,4 +1,4 @@
-import { ClipboardList, HeartHandshake, type LucideIcon } from 'lucide-react';
+import { ClipboardList, HardHat, HeartHandshake, type LucideIcon } from 'lucide-react';
 
 /**
  * Dashboard modules and their sub-topics. Add a sub-topic here and create
@@ -29,6 +29,12 @@ export const MODULES: DashboardModule[] = [
         label: 'Officer Return',
         description: 'Monthly Welfare Officer Return — manpower, facilities, health, safety, grievances & compliance',
         icon: ClipboardList,
+      },
+      {
+        slug: 'accident-tracker',
+        label: 'Accident Tracker',
+        description: 'Safety accidents, LTI, LTIFR & severity rates, and corrective-action tracking',
+        icon: HardHat,
       },
     ],
   },

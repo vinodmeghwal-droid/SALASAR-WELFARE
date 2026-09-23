@@ -63,15 +63,19 @@ function SyncButton() {
   async function onClick() {
     setBusy(true);
     try {
-      const result = await triggerSync(true);
+      const { results } = await triggerSync(true);
       await mutate(isBackendKey);
-      toast({
-        tone: 'success',
-        title: 'Synced with Google Drive',
-        description: result.changedMonths.length
-          ? `Updated: ${result.changedMonths.map((m) => m[0].toUpperCase() + m.slice(1)).join(', ')}`
-          : 'Already up to date',
-      });
+      const failed = results.filter((r) => r.error);
+      const updated = results.filter((r) => r.changedItems?.length).map((r) => r.label ?? r.dataset);
+      toast(
+        failed.length
+          ? { tone: 'error', title: 'Some workbooks failed to sync', description: failed.map((f) => f.error).join(' · ') }
+          : {
+              tone: 'success',
+              title: 'Synced with Google Drive',
+              description: updated.length ? `Updated: ${updated.join(', ')}` : 'Already up to date',
+            },
+      );
     } catch (error) {
       toast({ tone: 'error', title: 'Sync failed', description: (error as Error).message });
     } finally {
