@@ -10,6 +10,8 @@ const schema = z
     PORT: z.coerce.number().int().positive().default(4000),
 
     MONGODB_URI: z.string().min(1, 'MONGODB_URI is required'),
+    // Used only when the system resolver can't look up the Atlas SRV record. "" disables the fallback.
+    DNS_FALLBACK_SERVERS: z.string().default('8.8.8.8,1.1.1.1'),
 
     // Shared secret between the Next.js server and this API. The browser never sees it.
     INTERNAL_API_KEY: z.string().min(16, 'INTERNAL_API_KEY must be at least 16 characters'),

@@ -1,0 +1,15 @@
+{
+  "name": "salasar-welfare",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "HR Welfare dashboard — runs the backend API and the Next.js dashboard together.",
+  "scripts": {
+    "dev": "node scripts/dev.js",
+    "install:all": "npm --prefix backend install && npm --prefix frontend install",
+    "test": "npm --prefix backend test",
+    "build": "npm --prefix frontend run build",
+    "sync:once": "npm --prefix backend run sync:once",
+    "drive:authorize": "npm --prefix backend run drive:authorize"
+  }
+}

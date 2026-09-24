@@ -12,6 +12,7 @@ HR Welfare dashboard. Sub-topics: "Officer Return" (monthly welfare return) and 
   - Accident tracker: `parsers/accidentTracker/*` (register rows + Monthly KPI + Dashboard) → `domain/accidentTracker/{kpis,dataChecks,record}.js` → one `AccidentReturn` doc per FY → `services/accidentTrackerService`. Routes `/api/accident-tracker/{years,overview,incidents}`.
   - AI: `services/insightService` (datasets: officer-return | accident-tracker) → `domain/*/insightPrompt` (system prompt, JSON schema, aggregated context, no names/addresses) → `lib/gemini` (REST, structured output, falls back across `GEMINI_MODEL` + `GEMINI_FALLBACK_MODELS` on 429/5xx/404) → cached in `AiInsight` by `hashOf(context)`. `GET /api/insights?dataset=&period=`.
   - Drive auth: `sources/driveSource` uses an OAuth refresh token for the file owner (`scripts/authorize-drive.js`, `npm run drive:authorize`) if `GOOGLE_OAUTH_*` are set, else a service account.
+  - `lib/dnsFallback` runs before the Mongo connect: this machine's resolver is `127.0.0.1` and refuses queries, which breaks the `mongodb+srv://` SRV lookup, so the process switches to `DNS_FALLBACK_SERVERS` and logs a warning.
   - `parsers/workbookReader` retries without `xl/drawings/*` when exceljs chokes on drawing parts. Manpower `closing` is derived when its formula has no cached value.
 - `frontend/` Next 16 App Router, TS, Tailwind 4 (CSS-first, tokens in `src/app/globals.css`), next-auth v4 (Google), SWR, Recharts 3, motion (`motion/react`), lucide-react.
   - Browser → `/api/backend/[...path]` (session check, adds `x-api-key`, streams) → backend. Never call the backend from the client directly.
@@ -51,6 +52,7 @@ HR Welfare dashboard. Sub-topics: "Officer Return" (monthly welfare return) and 
 
 ## Commands
 ```
+root:     npm run dev   # starts backend + frontend together (scripts/dev.js); skips a port already in use
 backend:  npm run dev | npm test | npm run parse:file -- <xlsx> [sep] | npm run sync:once
 frontend: npm run dev | npm run build | npm run typecheck
 python tools/inspect_workbook.py <xlsx> [SheetName]
