@@ -4,7 +4,7 @@ import { env } from '../src/config/env.js';
 import { connectDatabase, disconnectDatabase } from '../src/config/db.js';
 import { createDatasetRegistry } from '../src/config/datasets.js';
 
-await connectDatabase(env.MONGODB_URI);
+await connectDatabase(env.MONGODB_URI, { dnsFallbackServers: env.DNS_FALLBACK_SERVERS });
 try {
   const registry = createDatasetRegistry(env);
   const only = process.argv[2];

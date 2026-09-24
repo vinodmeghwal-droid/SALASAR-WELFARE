@@ -95,6 +95,15 @@ SALASAR-Welfare/
    *Alternative:* a service account (`…@….iam.gserviceaccount.com` + JSON key) that the workbook is shared with as Viewer.
 4. **Gemini** (optional): an API key from AI Studio in `GEMINI_API_KEY`.
 
+### Running it day to day
+
+From the project root, one command starts **both** the API and the dashboard (Windows users can double-click `start-dashboard.cmd` instead):
+
+```bash
+npm run dev          # backend on :4000 + dashboard on :3000, Ctrl+C stops both
+```
+Both must be running: the dashboard only draws the screens, and all data comes from the backend. If the backend is down the page shows **"Backend service is unreachable"**. A port already in use is skipped, so this is safe to run when one of the two is already up.
+
 ### 2. Backend
 ```bash
 cd backend
@@ -126,6 +135,7 @@ npm run dev                 # http://localhost:3000
 | `SYNC_INTERVAL_SECONDS` | Poll interval (default 30, min 10) |
 | `GEMINI_API_KEY`, `GEMINI_MODEL`, `GEMINI_FALLBACK_MODELS` | AI analysis (optional; default model `gemini-flash-latest` + fallbacks) |
 | `CORS_ORIGIN`, `PORT` | Server settings |
+| `DNS_FALLBACK_SERVERS` | Public DNS used only when the system resolver can't look up the Atlas SRV record (default `8.8.8.8,1.1.1.1`; `""` disables) |
 
 | Frontend (`frontend/.env.local`) | Purpose |
 |---|---|
@@ -174,6 +184,15 @@ And in the **Accident Tracker** workbook:
 - **A new sub-topic** under HR Welfare: add it to `frontend/src/config/navigation.ts` and create `frontend/src/app/(dashboard)/hr-welfare/<slug>/page.tsx`. If it has its own workbook, add a dataset entry in `backend/src/config/datasets.js` (with a parser + ingest) and whitelist its API root in `frontend/src/app/api/backend/[...path]/route.ts`.
 - **A new workbook field**: extend `backend/src/parsers/officerReturn/schema.js` (header or section matcher), compute it in `domain/officerReturn/kpis.js`, add it to `frontend/src/types/officer-return.ts`, then render it.
 - **A new financial year**: point `DRIVE_FILE_ID` at the new workbook. Data is stored per FY, and `?fy=` selects one.
+
+## Troubleshooting
+
+| Symptom | Cause and fix |
+|---|---|
+| Dashboard shows **"Backend service is unreachable"** | The API isn't running. Start both with `npm run dev` from the project root, then check http://localhost:4000/health |
+| Backend exits with **`querySrv ECONNREFUSED`** | The machine's DNS resolver (often `127.0.0.1` from a VPN or ad-blocker) isn't answering, so the Atlas hostname can't be looked up. The backend automatically retries via `DNS_FALLBACK_SERVERS` and logs a warning; the permanent fix is to repair the system DNS setting |
+| Backend exits with **"port already in use"** | An older copy is still running. Find it with `netstat -ano \| findstr :4000` and stop that PID |
+| Sign-in loops back to the login page | `NEXTAUTH_SECRET` missing or changed, or the account is not in `ALLOWED_EMAILS` |
 
 ## Production notes
 

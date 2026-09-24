@@ -7,7 +7,7 @@ import { createApp } from './app.js';
 import { createGeminiClient } from './lib/gemini.js';
 import { createInsightService } from './services/insightService.js';
 
-await connectDatabase(env.MONGODB_URI);
+await connectDatabase(env.MONGODB_URI, { dnsFallbackServers: env.DNS_FALLBACK_SERVERS });
 
 const syncRegistry = createDatasetRegistry(env);
 const gemini = createGeminiClient({
